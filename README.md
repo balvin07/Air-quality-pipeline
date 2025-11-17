@@ -6,7 +6,7 @@ Este proyecto implementa una arquitectura distribuida para simular, procesar, al
 
 ## 🧱 Arquitectura
 
-![Diagrama de arquitectura](images/arquitectura.png)
+![Diagrama de arquitectura](images/arquitec.png)
 
 - **Simulador**: genera datos de CO₂, PM2.5, temperatura y humedad
 - **FastAPI**: expone endpoints REST y envía datos a Kafka
