@@ -1,0 +1,6 @@
+streamlit
+pandas
+minio
+altair
+requests
+psycopg2-binary

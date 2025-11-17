@@ -1,0 +1,179 @@
+﻿services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - mlops-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+    - zookeeper
+    ports:
+    - "9092:9092"
+    - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://host.docker.internal:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+    - mlops-network
+
+
+
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: admin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ./data/minio:/data
+    networks:
+      - mlops-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres-dwh
+    environment:
+      POSTGRES_USER: airquality
+      POSTGRES_PASSWORD: airquality123
+      POSTGRES_DB: air_quality_dwh
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mlops-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airquality"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@airquality.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - mlops-network
+    depends_on:
+      - postgres
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-worldmap-panel,grafana-piechart-panel
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - mlops-network
+    depends_on:
+      - postgres
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+    - kafka
+    ports:
+    - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: host.docker.internal:29092
+    networks:
+    - mlops-network
+
+
+
+  api:
+    build:
+      context: ./fastapi
+    container_name: fastapi-api
+    ports:
+      - "8000:8000"
+    environment:
+      KAFKA_BROKER: kafka:9092
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: admin
+      MINIO_SECRET_KEY: admin123
+    networks:
+      - mlops-network
+    depends_on:
+      - kafka
+      - minio
+
+  simulator:
+    build:
+      context: ./scripts
+      dockerfile: Dockerfile.simulator
+    container_name: simulator
+    networks:
+      - mlops-network
+    depends_on:
+      - kafka
+
+  streamlit:
+    build:
+      context: ./app
+      dockerfile: Dockerfile.streamlit
+    container_name: streamlit
+    ports:
+    - "8501:8501"
+    networks:
+    - mlops-network
+    depends_on:
+    - minio
+
+
+
+  consumer:
+    build:
+      context: ./scripts
+      dockerfile: Dockerfile.consumer
+    container_name: consumer
+    networks:
+      - mlops-network
+    depends_on:
+      - kafka
+      - postgres
+
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+  grafana_data:
+
+networks:
+  mlops-network:
+    driver: bridge

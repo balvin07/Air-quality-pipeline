@@ -1,0 +1,14 @@
+# Dockerfile.consumer
+FROM python:3.13-slim
+
+WORKDIR /app
+
+# Copiar dependencias
+COPY ../requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar el script del consumidor
+COPY kafka_consumer_postgres.py .
+
+# Ejecutar el consumidor
+CMD ["python", "kafka_consumer_postgres.py"]
