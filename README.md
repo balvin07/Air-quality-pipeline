@@ -38,7 +38,7 @@ Simulador IoT
 
 ---
 
-## 🚀 Inicio rápido
+# Inicio rápido
 
 ### Prerrequisitos
 
@@ -59,8 +59,6 @@ cd Air-quality-pipeline
 cp .env.example .env
 # Edita .env si quieres cambiar credenciales
 ```
-
-> ⚠️ El archivo `.env` está en `.gitignore` — nunca lo subas a GitHub con credenciales reales.
 
 ### 3. Levantar todos los servicios
 
